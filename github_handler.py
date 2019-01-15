@@ -20,7 +20,9 @@ def handle_pull_requests(repo_handler, payload, headers):
 
     head_sha = payload['check_run']['head_sha']
 
-    if payload['check_run']['conclusion'] != 'success':
+    if payload['check_run']['conclusion'] == 'in_progress':
+        repo_handler.set_status('pending', 'Waiting for artifacts', 'wwt-artifacts-bot', head_sha)
+    elif payload['check_run']['conclusion'] != 'success':
         repo_handler.set_status('error', 'No artifacts produced', 'wwt-artifacts-bot', head_sha)
         return
 
