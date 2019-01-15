@@ -30,7 +30,7 @@ def handle_pull_requests(repo_handler, payload, headers):
 
     # details_url is a URL of the form:
     # https://dev.azure.com/thomasrobitaille/<pipeline>/_build/results?buildId=<build_id>
-    if '?buildID=' not in details_url or '/_build/' not in details_url:
+    if '?buildId=' not in details_url or '/_build/' not in details_url:
         repo_handler.set_status('error', 'Could not parse Azure details URL', 'wwt-artifacts-bot', head_sha, target_url=details_url)
         return
 
