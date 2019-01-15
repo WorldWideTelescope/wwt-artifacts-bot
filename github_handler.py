@@ -50,7 +50,7 @@ def handle_pull_requests(repo_handler, payload, headers):
 
     else:
 
-        artifact = artifacts[0]
+        artifact = artifacts['value'][0]
         download_url = artifacts_url + '?artifactName={name}&fileId={data}&fileName={name}&api-version=5.0-preview.5'.format(name=artifact['name'], data=artifact['resource']['name'])
 
         repo_handler.set_status('success', 'Artifact {name} produced by Azure Pipelines'.format(name=artifact['name']),
