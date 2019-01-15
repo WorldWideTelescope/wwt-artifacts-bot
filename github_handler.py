@@ -18,12 +18,13 @@ def handle_pull_requests(repo_handler, payload, headers):
     if payload['check_run']['app']['name'] != 'Azure Pipelines':
         return
 
+    head_sha = payload['check_run']['head_sha']
+
     if payload['check_run']['conclusion'] != 'success':
+        repo_handler.set_status('error', 'No artifacts produced', 'wwt-artifacts-bot', head_sha)
         return
 
     details_url = payload['check_run']['details_url']
-
-    head_sha = payload['check_run']['head_sha']
 
     # details_url is a URL of the form:
     # https://dev.azure.com/thomasrobitaille/<pipeline>/_build/results?buildId=<build_id>
