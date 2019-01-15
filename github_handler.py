@@ -8,8 +8,6 @@ from baldrick.blueprints.github import github_webhook_handler
 @github_webhook_handler
 def handle_pull_requests(repo_handler, payload, headers):
 
-    pr_handler = PullRequestHandler(repo_handler.repo, number, repo_handler.installation)
-
     event = headers['X-GitHub-Event']
 
     # We are only intersted in checks that are completed
@@ -25,10 +23,12 @@ def handle_pull_requests(repo_handler, payload, headers):
 
     details_url = payload['check_run']['details_url']
 
+    head_sha = payload['check_run']['head_sha']
+
     # details_url is a URL of the form:
     # https://dev.azure.com/thomasrobitaille/<pipeline>/_build/results?buildId=<build_id>
     if '?buildID=' not in details_url or '/_build/' not in details_url:
-        print('ERROR: URL did not match pattern: ' + details_url)
+        repo_handler.set_status('error', 'Could not parse Azure details URL', 'wwt-artifacts-bot', head_sha)
         return
 
     build_id = details_url.split('buildId=')[1]
@@ -37,12 +37,18 @@ def handle_pull_requests(repo_handler, payload, headers):
 
     artifacts = requests.get(artifacts_url).json()
 
-    if artifacts['count'] > 0:
+    if artifacts['count'] > 1:
 
-        message = 'The Azure Pipelines build produced the following artifacts:\n\n'
+        repo_handler.set_status('error', 'Too many artifacts produced', 'wwt-artifacts-bot', head_sha, target_url=artifacts_url)
 
-        for artifact in artifacts['value']:
-            download_url = artifacts_url + '?artifactName={name}&fileId={data}&fileName={name}&api-version=5.0-preview.5'.format(name=artifact['name'], data=artifact['resource']['name'])
-            message += '* [{name}]({url})\n'.format(name=artifact['name'], url=download_url)
+    elif artifacts['count'] == 0:
 
-        pr_handler.submit_comment(message)
+        repo_handler.set_status('error', 'No artifacts produced', 'wwt-artifacts-bot', head_sha, target_url=artifacts_url)
+
+    else:
+
+        artifact = artifacts[0]
+        download_url = artifacts_url + '?artifactName={name}&fileId={data}&fileName={name}&api-version=5.0-preview.5'.format(name=artifact['name'], data=artifact['resource']['name'])
+
+        repo_handler.set_status('success', 'Artifact {name} produced by Azure Pipelines'.format(name=artifact['name']),
+                                'wwt-artifacts-bot', head_sha, target_url=download_url)
