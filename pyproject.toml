@@ -1,0 +1,3 @@
+# Available settings to override the default behavior for each plugin are
+# commented out. The only required setting if you want to use a plugin is
+# enabled = true
