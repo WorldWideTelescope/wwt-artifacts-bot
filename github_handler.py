@@ -1,8 +1,63 @@
 import requests
-from flask import current_app
 
-from baldrick.github.github_api import PullRequestHandler
 from baldrick.blueprints.github import github_webhook_handler
+
+from flask import Blueprint, request
+
+
+azure_artifacts_blueprint = Blueprint('azure_artifacts', __name__)
+
+
+ARTIFACTS_ROOT_URL = ("https://dev.azure.com/thomasrobitaille/{pipeline_id}"
+                      "/_apis/build/builds/{build_id}/artifacts")
+
+
+@azure_artifacts_blueprint.route('/azure_list_artifacts', methods=['GET'])
+def azure_list_artifacts():
+
+    pipeline_id = request.args.get('pipeline_id')
+    build_id = request.args.get('build_id')
+
+    if pipeline_id is None:
+        return "Pipeline ID missing"
+
+    if build_id is None:
+        return "Build ID missing"
+
+    artifacts_url = ARTIFACTS_ROOT_URL.format(pipeline_id=pipeline_id, build_id=build_id)
+
+    artifacts = requests.get(artifacts_url).json()
+
+    result = "<html><body>Build {build_id} produced the following artifacts:<ul>".format(build_id=build_id)
+
+    for artifact in artifacts['value']:
+        artifact_url = f'/azure_get_artifact?pipeline_id={pipeline_id}&build_id={build_id}&filename={artifact["name"]}&file_id={artifact["resource"]["data"]}'
+        result += '<li><a href="{artifact_url}">{name}</a>'.format(artifact_url=artifact_url, name=artifact['name'])
+
+    return result
+
+
+@azure_artifacts_blueprint.route('/azure_get_artifact', methods=['GET'])
+def azure_get_artifact():
+
+    pipeline_id = request.args.get('pipeline_id')
+    build_id = request.args.get('build_id')
+    filename = request.args.get('filename')
+    file_id = request.args.get('file_id')
+
+    artifact_url = ARTIFACTS_ROOT_URL.format(pipeline_id=pipeline_id, build_id=build_id)
+
+    params = {'artifactName': filename,
+              'fileName': filename,
+              'fileId': file_id,
+              'api-version': '5.0-preview.5'}
+
+    artifact = requests.get(artifact_url, params).json()
+    params['fileId'] = artifact['items'][0]['blob']['id']
+
+    artifact = requests.get(artifact_url, params)
+
+    return artifact.content
 
 
 @github_webhook_handler
@@ -35,23 +90,8 @@ def handle_pull_requests(repo_handler, payload, headers):
         return
 
     build_id = details_url.split('buildId=')[1]
-    base_url = details_url.split('_build')[0]
-    artifacts_url = f'{base_url}/_apis/build/builds/{build_id}/artifacts'
+    pipeline_id = details_url.split('/dev.azure.com/')[1].split('/')[1]
 
-    artifacts = requests.get(artifacts_url).json()
+    artifacts_url = request.base_url + f'/azure_list_artifacts?pipeline_id={pipeline_id}&build_id={build_id}'
 
-    if artifacts['count'] > 1:
-
-        repo_handler.set_status('error', 'Too many artifacts produced', 'wwt-artifacts-bot', head_sha, target_url=artifacts_url)
-
-    elif artifacts['count'] == 0:
-
-        repo_handler.set_status('error', 'No artifacts produced', 'wwt-artifacts-bot', head_sha, target_url=artifacts_url)
-
-    else:
-
-        artifact = artifacts['value'][0]
-        download_url = artifacts_url + '?artifactName={name}&fileId={data}&fileName={name}&api-version=5.0-preview.5'.format(name=artifact['name'], data=artifact['resource']['data'])
-
-        repo_handler.set_status('success', 'Artifact {name} produced by Azure Pipelines'.format(name=artifact['name']),
-                                'wwt-artifacts-bot', head_sha, target_url=download_url)
+    repo_handler.set_status('error', 'Click Details to see artifacts produced by Azure Pipelines', 'wwt-artifacts-bot', head_sha, target_url=artifacts_url)

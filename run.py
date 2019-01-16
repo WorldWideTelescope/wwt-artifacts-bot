@@ -7,6 +7,7 @@ app = create_app('wwt-artifacts-bot')
 
 # Import plugins
 import github_handler
+app.register_blueprint(github_handler.azure_artifacts_blueprint)
 
 # Bind to PORT if defined, otherwise default to 5000.
 port = int(os.environ.get('PORT', 5000))
