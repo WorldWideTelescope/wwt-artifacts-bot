@@ -92,6 +92,7 @@ def handle_pull_requests(repo_handler, payload, headers):
     build_id = details_url.split('buildId=')[1]
     pipeline_id = details_url.split('/dev.azure.com/')[1].split('/')[1]
 
-    artifacts_url = request.base_url + f'/azure_list_artifacts?pipeline_id={pipeline_id}&build_id={build_id}'
+    root = request.base_url.rsplit('/', 1)[0]
+    artifacts_url = root + f'/azure_list_artifacts?pipeline_id={pipeline_id}&build_id={build_id}'
 
     repo_handler.set_status('success', 'Click Details to see artifacts produced by Azure Pipelines', 'wwt-artifacts-bot', head_sha, target_url=artifacts_url)
